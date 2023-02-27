@@ -55,8 +55,10 @@ class Gestrec():
         self._cap_proc = None
 
     def __start_listener__(self):
+        # initialize and start parallel process (multiprocessing)
         self._cap_proc = Process(target=self.__run_gestrec__)
         self._cap_proc.start()
+        # set listener on a port
         listener = get_conn_listener(GESTREC_PORT)
         while True:
             con = listener.accept()
@@ -134,7 +136,7 @@ class Gestrec():
                 # process hand landmarks
                 hand_landmarks = get_nearest_hand(results.multi_hand_landmarks)
                 landmarks = preprocess_landmarks(hand_landmarks)
-                land_q.append(landmarks)
+                land_q.append(landmarks)        # queue
 
                 # process landmarks and save to CSV when in dev_mode
                 if self.dev_mode and label != -1:
@@ -147,7 +149,7 @@ class Gestrec():
 
                 # predict gesture using model
                 if not self.dev_mode and self._model_active.value and len(land_q) == land_q.maxlen:
-                    predict_result = np.squeeze(model.predict_proba(np.array(land_q).reshape(1, -1)))
+                    predict_result = np.squeeze(model.predict_proba(np.array(land_q).reshape(1, -1)))       # pass the queue
                     idx = np.argmax(predict_result)
                     gesture, confidence = labels[idx], predict_result[idx]
                     if idx != 0:

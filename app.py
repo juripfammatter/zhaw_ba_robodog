@@ -2,6 +2,7 @@ import os
 import sys
 from PyQt5.uic import loadUi
 from PyQt5.QtWidgets import QDialog, QApplication, QStackedWidget, QWidget
+
 from commandexec import CommandExecutor, NoConnectionError, commandexec_stop, execute_command, COMMAND_SIT, COMMAND_STAND
 from gestrec import Gestrec, gestrec_stop, gestrec_on, gestrec_off
 
@@ -15,7 +16,7 @@ gesterc = Gestrec()
 class StartScreen(QDialog):
     def __init__(self):
         super(StartScreen, self).__init__()
-        loadUi(ui_startwindow, self)
+        loadUi(ui_startwindow, self)                            # Plug-in (platform-independent abstractions for GUIs)
         self.connectButton.clicked.connect(self.go_to_control)
         self.exitButton.clicked.connect(self.close_app)
 
@@ -37,6 +38,7 @@ class ControlScreen(QDialog):
     def __init__(self):
         super(ControlScreen, self).__init__()
         loadUi(ui_control_window, self)
+        # assign handlers to buttons
         self.activateButton.clicked.connect(self.start_recognition)
         self.stopButton.clicked.connect(self.stop_recognition)
         self.exitButton.clicked.connect(self.close_app)
@@ -44,6 +46,7 @@ class ControlScreen(QDialog):
         self.standButton.clicked.connect(self.stand_up)
         gesterc.start()
 
+    # handlers of buttons
     def start_recognition(self):
         gestrec_on()
         self.recognitionLabel.setText("Gesture Recognition: on ")
@@ -64,10 +67,11 @@ class ControlScreen(QDialog):
         sys.exit()
 
 
+# Main function (when running GUI)
 if __name__ == '__main__':
     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     app = QApplication(sys.argv)
-    start = StartScreen()
+    start = StartScreen()           # startscreen then calls controlscreen
     # start = ControlScreen()
     widget = QStackedWidget()
     widget.addWidget(start)
