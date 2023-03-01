@@ -23,7 +23,7 @@ pip install -r path\to\requirements.txt
 
 1. Start the robot
 2. Connect to the A1's WIFI hotspot: The SSID of the Wifi network of A1's hot-spot begins with UnitreeRoboticsA1 and the default password is 00000000.
-3. Open a terminal and connect to the robot with ssh -X unitree@192.168.123.12. Enter the password 
+3. Open a terminal and connect to the robot with ssh -X unitree@192.168.123.12. Enter the password 123
 4. This is important as it adds the robot to the known hosts.
 5. Start the UI (app.py) and connect to the robot
 6. Press on sit and activate gesture recognition
