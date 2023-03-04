@@ -72,11 +72,13 @@ class Gestrec():
                 self._model_active.value = True
 
     def start(self):
+        # initialize and start parallel process (multiprocessing)
         proc = Process(target=self.__start_listener__)
         proc.start()
         sleep(1)
         return proc
 
+    # runs in parallel
     def __run_gestrec__(self):
         # video capture ################################################################################################
 
