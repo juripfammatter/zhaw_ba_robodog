@@ -58,8 +58,9 @@ class Gestrec():
         # initialize and start parallel process (multiprocessing)
         self._cap_proc = Process(target=self.__run_gestrec__)
         self._cap_proc.start()
-        # set listener on a port
+        # set listener on port 4444
         listener = get_conn_listener(GESTREC_PORT)
+        # polly permanently: process messages and calls functions
         while True:
             con = listener.accept()
             msg = con.recv()
@@ -73,6 +74,7 @@ class Gestrec():
 
     def start(self):
         # initialize and start parallel process (multiprocessing)
+        # starts the listener in parallel
         proc = Process(target=self.__start_listener__)
         proc.start()
         sleep(1)
@@ -81,11 +83,9 @@ class Gestrec():
     # runs in parallel
     def __run_gestrec__(self):
         # video capture ################################################################################################
-
         cap = cv2.VideoCapture(self.cv_cap_source)
 
         # mediapipe ####################################################################################################
-
         hands = mp_hands.Hands(
             model_complexity=self.mediapipe_model_complexity,
             min_detection_confidence=self.mediapipe_min_detection_confidence,
@@ -94,7 +94,6 @@ class Gestrec():
         )
 
         # landmarks queue ##############################################################################################
-
         land_q = deque(maxlen=32)
 
         # ml model #####################################################################################################
@@ -102,10 +101,10 @@ class Gestrec():
         labels = read_labels(self.model_labels_path) if not self.dev_mode else None
 
         # app ##########################################################################################################
-
         label = -1
         label_count = 1
 
+        # runs in parallel as long as cap.isOpened is true
         while cap.isOpened():
             # capture image
             success, image = cap.read()

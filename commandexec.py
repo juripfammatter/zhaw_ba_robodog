@@ -21,6 +21,7 @@ class CommandExecutor():
 
     def start(self):
         if check_connection():
+            # start process in parallel, if "Connect to Robot" is clicked
             proc = Process(target=self.__start_listener__)
             proc.start()
             sleep(1)
@@ -77,7 +78,13 @@ class CommandExecutor():
 
 
 def execute_command(command):
-    con = get_conn_client(COMMAND_PORT)
+    # def get_conn_client(port):
+    #     return Client((ADDRESS, port), authkey=AUTHKEY)
+
+    # Returns a connection to the address of a `Listener`
+    con = get_conn_client(COMMAND_PORT)         # port 8888, (other file: from multiprocessing.connection import Listener, Client)
+
+    # e.g. COMMAND_STAND
     con.send(command)
     con.close()
 
