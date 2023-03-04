@@ -6,13 +6,15 @@ from PyQt5.QtWidgets import QDialog, QApplication, QStackedWidget, QWidget
 from commandexec import CommandExecutor, NoConnectionError, commandexec_stop, execute_command, COMMAND_SIT, COMMAND_STAND
 from gestrec import Gestrec, gestrec_stop, gestrec_on, gestrec_off
 
+# Variables
 ui_startwindow = 'ui/start_window.ui'
 ui_control_window = 'ui/control_window.ui'
 
+# Objects
 commandexec = CommandExecutor()
-gesterc = Gestrec()
+gestrec = Gestrec()
 
-
+# Class 1 of 2
 class StartScreen(QDialog):
     def __init__(self):
         super(StartScreen, self).__init__()
@@ -33,7 +35,7 @@ class StartScreen(QDialog):
         commandexec_stop()
         sys.exit()
 
-
+# Class 2 of 2
 class ControlScreen(QDialog):
     def __init__(self):
         super(ControlScreen, self).__init__()
@@ -44,7 +46,7 @@ class ControlScreen(QDialog):
         self.exitButton.clicked.connect(self.close_app)
         self.sitButton.clicked.connect(self.sit_down)
         self.standButton.clicked.connect(self.stand_up)
-        gesterc.start()
+        gestrec.start()
 
     # handlers of buttons
     def start_recognition(self):
