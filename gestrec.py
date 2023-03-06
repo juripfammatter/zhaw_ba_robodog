@@ -15,7 +15,6 @@ mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
 
-
 _GESTREC_ON = 'on'
 _GESTREC_OFF = 'off'
 _GSTREC_STOP = 'stop'
@@ -30,6 +29,7 @@ _COMMANDS_DICT = {
 
 class Gestrec():
 
+    # set member-variables
     def __init__(self) -> None:
         # mediapipe
         self.mediapipe_model_complexity = 0
@@ -49,30 +49,38 @@ class Gestrec():
         # openCV
         self.cv_cap_flip = True
         self.cv_cap_source = 0  # 0 == default device
-        self.cv_cap_source = 'http://192.168.123.12:8080/?action=stream'  # 0 == default device
+        #self.cv_cap_source = 'http://192.168.123.12:8080/?action=stream'  # 0 == default device
 
         # processes
         self._cap_proc = None
 
     def __start_listener__(self):
-        # initialize and start parallel process (multiprocessing)
+        print("Entered __start_listener__")
+        print("Listening to GESTREC_PORT")
+        # initialize and start self.__run_gestrec__ as parallel process (multiprocessing)
         self._cap_proc = Process(target=self.__run_gestrec__)
         self._cap_proc.start()
-        # set listener on a port
+        print("Started parallel process __run_gestrec__")
+        # __run_gestrec__ listens to GESTREC_PORT = 4444
         listener = get_conn_listener(GESTREC_PORT)
+        # poll permanently: process messages and calls functions
         while True:
             con = listener.accept()
-            msg = con.recv()
+            msg = con.recv()                # received message on GESTREC_PORT = 4444
+            print("received message on GESTREC_PORT = 4444"); sleep(5)
             if msg == _GSTREC_STOP:
                 self._cap_proc.terminate()
                 sys.exit()
             elif msg == _GESTREC_OFF:
                 self._model_active.value = False
             elif msg == _GESTREC_ON:
+                print("received _GESTREC_ON"); sleep(5)
                 self._model_active.value = True
 
     def start(self):
         # initialize and start parallel process (multiprocessing)
+        # starts the listener in parallel
+        print("Entered gestrec.start()")
         proc = Process(target=self.__start_listener__)
         proc.start()
         sleep(1)
@@ -81,11 +89,9 @@ class Gestrec():
     # runs in parallel
     def __run_gestrec__(self):
         # video capture ################################################################################################
-
         cap = cv2.VideoCapture(self.cv_cap_source)
 
         # mediapipe ####################################################################################################
-
         hands = mp_hands.Hands(
             model_complexity=self.mediapipe_model_complexity,
             min_detection_confidence=self.mediapipe_min_detection_confidence,
@@ -94,7 +100,6 @@ class Gestrec():
         )
 
         # landmarks queue ##############################################################################################
-
         land_q = deque(maxlen=32)
 
         # ml model #####################################################################################################
@@ -102,10 +107,11 @@ class Gestrec():
         labels = read_labels(self.model_labels_path) if not self.dev_mode else None
 
         # app ##########################################################################################################
-
         label = -1
         label_count = 1
 
+        print("Prepared __run_gestrec__")
+        # runs in parallel as long as cap.isOpened is true
         while cap.isOpened():
             # capture image
             success, image = cap.read()
@@ -140,6 +146,8 @@ class Gestrec():
                 landmarks = preprocess_landmarks(hand_landmarks)
                 land_q.append(landmarks)        # queue
 
+                print("Added to queue")
+
                 # process landmarks and save to CSV when in dev_mode
                 if self.dev_mode and label != -1:
                     if len(land_q) == land_q.maxlen:
@@ -150,14 +158,18 @@ class Gestrec():
                         label = -1
 
                 # predict gesture using model
+                #print(self.dev_mode,self._model_active.value, len(land_q))
                 if not self.dev_mode and self._model_active.value and len(land_q) == land_q.maxlen:
+
+                    #print("Got into classification block")
+                    #sleep(10)
                     predict_result = np.squeeze(model.predict_proba(np.array(land_q).reshape(1, -1)))       # pass the queue
                     idx = np.argmax(predict_result)
                     gesture, confidence = labels[idx], predict_result[idx]
                     if idx != 0:
                         if confidence >= self.model_min_confidence:
                             # execute command
-                            execute_command(_COMMANDS_DICT[idx])
+                            #execute_command(_COMMANDS_DICT[idx])
                             land_q.clear()
                         # print text to image
                         cv2.putText(
@@ -193,8 +205,8 @@ class Gestrec():
             cv2.imshow('MediaPipe Hands', image)
 
 
-def __send_command__(command):
-    con = get_conn_client(GESTREC_PORT)
+def __send_command__(command):              # MP-command e.g. _GESTREC_ON
+    con = get_conn_client(GESTREC_PORT)     # return MP-Client((ADDRESS, port), authkey=AUTHKEY)
     con.send(command)
     con.close()
 

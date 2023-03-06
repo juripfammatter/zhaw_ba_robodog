@@ -6,11 +6,14 @@ from PyQt5.QtWidgets import QDialog, QApplication, QStackedWidget, QWidget
 from commandexec import CommandExecutor, NoConnectionError, commandexec_stop, execute_command, COMMAND_SIT, COMMAND_STAND
 from gestrec import Gestrec, gestrec_stop, gestrec_on, gestrec_off
 
+from time import sleep
+
+
 ui_startwindow = 'ui/start_window.ui'
 ui_control_window = 'ui/control_window.ui'
 
 commandexec = CommandExecutor()
-gesterc = Gestrec()
+gestrec = Gestrec()
 
 
 class StartScreen(QDialog):
@@ -22,7 +25,7 @@ class StartScreen(QDialog):
 
     def go_to_control(self):
         try:
-            commandexec.start()
+            #commandexec.start()
             control = ControlScreen()
             widget.addWidget(control)
             widget.setCurrentWidget(control)
@@ -44,7 +47,9 @@ class ControlScreen(QDialog):
         self.exitButton.clicked.connect(self.close_app)
         self.sitButton.clicked.connect(self.sit_down)
         self.standButton.clicked.connect(self.stand_up)
-        gesterc.start()
+        print("registered buttons")
+        print("calling gestrec.start() now")
+        gestrec.start()
 
     # handlers of buttons
     def start_recognition(self):
