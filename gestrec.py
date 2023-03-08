@@ -54,6 +54,16 @@ class Gestrec():
         # processes
         self._cap_proc = None
 
+        # private
+        self.__cap = 0
+        self.__hands = 0
+        self.__land_q = 0
+        self.__model = 0
+        self.__labels = 0
+        self.__label = 0
+        self.__label_count = 0
+
+
     def __start_listener__(self):
         print("Entered __start_listener__")
         print("Listening to GESTREC_PORT")
@@ -63,18 +73,19 @@ class Gestrec():
         print("Started parallel process __run_gestrec__")
         # __run_gestrec__ listens to GESTREC_PORT = 4444
         listener = get_conn_listener(GESTREC_PORT)
-        # poll permanently: process messages and calls functions
+        # poll permanently: process messages and set flags
         while True:
             con = listener.accept()
             msg = con.recv()                # received message on GESTREC_PORT = 4444
-            print("received message on GESTREC_PORT = 4444"); sleep(5)
+            print("received message on GESTREC_PORT = 4444")
             if msg == _GSTREC_STOP:
                 self._cap_proc.terminate()
                 sys.exit()
             elif msg == _GESTREC_OFF:
+                print("received _GESTREC_OFF")
                 self._model_active.value = False
             elif msg == _GESTREC_ON:
-                print("received _GESTREC_ON"); sleep(5)
+                print("received _GESTREC_ON")
                 self._model_active.value = True
 
     def start(self):
@@ -86,13 +97,76 @@ class Gestrec():
         sleep(1)
         return proc
 
+    def process_landmarks(self, image, results):
+        # process hand landmarks
+        hand_landmarks = get_nearest_hand(results.multi_hand_landmarks)
+        landmarks = preprocess_landmarks(hand_landmarks)
+        self.__land_q.append(landmarks)        # queue
+
+        print("Added to queue")
+
+        # process landmarks and save to CSV when in dev_mode
+        if self.dev_mode and self.__label != -1:
+            if len(self.__land_q) == self.__land_q.maxlen:
+                write_csv(self.__label, list(self.__land_q), self.dev_data_path)
+                self.__land_q.clear()
+                print(f'done_saving {self.__label_count}st label with id {self.__label}')
+                self.__label_count += 1
+                self.__label = -1
+
+        # predict gesture using model
+        #print(self.dev_mode,self._model_active.value, len(land_q))
+        if not self.dev_mode and self._model_active.value and len(self.__land_q) == self.__land_q.maxlen:
+
+            #print("Got into classification block")
+            #sleep(10)
+            predict_result = np.squeeze(self.__model.predict_proba(np.array(self.__land_q).reshape(1, -1)))       # pass the queue
+            idx = np.argmax(predict_result)
+            gesture, confidence = self.__labels[idx], predict_result[idx]
+            if idx != 0:
+                if confidence >= self.model_min_confidence:
+                    # execute command
+                    #execute_command(_COMMANDS_DICT[idx])
+                    self.__land_q.clear()
+                # print text to image
+                cv2.putText(
+                    image, f'Gesture: {gesture}', (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0),
+                    4, cv2.LINE_AA)
+                cv2.putText(
+                    image, f'Gesture: {gesture}', (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255),
+                    2, cv2.LINE_AA)
+                cv2.putText(image, f'Confidence: {confidence:.3f}', (10, 65),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4, cv2.LINE_AA)
+                cv2.putText(image, f'Confidence: {confidence:.3f}', (10, 65),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
+
+        # draw boundingbox
+        x, y, w, h = bounding_rect(image, hand_landmarks)
+        cv2.rectangle(image, (x, y), (w, h), (0, 0, 255), 1)
+        cv2.rectangle(image, (x, y), (w, y-22), (0, 0, 255), -1)
+        cv2.putText(image, 'Tracking', (x + 5, y - 4),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+
+        # draw hands
+        for hand_landmarks in results.multi_hand_landmarks:
+            mp_drawing.draw_landmarks(
+                image,
+                hand_landmarks,
+                mp_hands.HAND_CONNECTIONS,
+                mp_drawing_styles.get_default_hand_landmarks_style(),
+                mp_drawing_styles.get_default_hand_connections_style())
+
+
+
     # runs in parallel
     def __run_gestrec__(self):
         # video capture ################################################################################################
-        cap = cv2.VideoCapture(self.cv_cap_source)
+        self.__cap = cv2.VideoCapture(self.cv_cap_source)
 
         # mediapipe ####################################################################################################
-        hands = mp_hands.Hands(
+        self.__hands = mp_hands.Hands(
             model_complexity=self.mediapipe_model_complexity,
             min_detection_confidence=self.mediapipe_min_detection_confidence,
             min_tracking_confidence=self.mediapipe_min_tracking_confidence,
@@ -100,21 +174,21 @@ class Gestrec():
         )
 
         # landmarks queue ##############################################################################################
-        land_q = deque(maxlen=32)
+        self.__land_q = deque(maxlen=32)
 
         # ml model #####################################################################################################
-        model = joblib.load(self.model_path) if not self.dev_mode else None
-        labels = read_labels(self.model_labels_path) if not self.dev_mode else None
+        self.__model = joblib.load(self.model_path) if not self.dev_mode else None
+        self.__labels = read_labels(self.model_labels_path) if not self.dev_mode else None
 
         # app ##########################################################################################################
-        label = -1
-        label_count = 1
+        self.__label = -1
+        self.__label_count = 1
 
         print("Prepared __run_gestrec__")
         # runs in parallel as long as cap.isOpened is true
-        while cap.isOpened():
+        while self.__cap.isOpened():
             # capture image
-            success, image = cap.read()
+            success, image = self.__cap.read()
             if not success:
                 print("Ignoring empty camera frame.")
                 continue
@@ -124,7 +198,7 @@ class Gestrec():
             image.flags.writeable = False
 
             # process with mediapipe
-            results = hands.process(image)
+            results = self.__hands.process(image)
 
             # revert image color back
             image.flags.writeable = True
@@ -134,72 +208,15 @@ class Gestrec():
             key = cv2.waitKey(10) & 0xFF
             if key == 27:  # esc
                 cv2.destroyAllWindows()
-                cap.release()
+                self.__cap.release()
                 break
             if 48 <= key <= 57:  # 0 - 9
-                label = key - 48
+                self.__label = key - 48
 
             if results.multi_hand_landmarks:
+                #process_Landmarks
+                self.process_landmarks(image, results)
 
-                # process hand landmarks
-                hand_landmarks = get_nearest_hand(results.multi_hand_landmarks)
-                landmarks = preprocess_landmarks(hand_landmarks)
-                land_q.append(landmarks)        # queue
-
-                print("Added to queue")
-
-                # process landmarks and save to CSV when in dev_mode
-                if self.dev_mode and label != -1:
-                    if len(land_q) == land_q.maxlen:
-                        write_csv(label, list(land_q), self.dev_data_path)
-                        land_q.clear()
-                        print(f'done_saving {label_count}st label with id {label}')
-                        label_count += 1
-                        label = -1
-
-                # predict gesture using model
-                #print(self.dev_mode,self._model_active.value, len(land_q))
-                if not self.dev_mode and self._model_active.value and len(land_q) == land_q.maxlen:
-
-                    #print("Got into classification block")
-                    #sleep(10)
-                    predict_result = np.squeeze(model.predict_proba(np.array(land_q).reshape(1, -1)))       # pass the queue
-                    idx = np.argmax(predict_result)
-                    gesture, confidence = labels[idx], predict_result[idx]
-                    if idx != 0:
-                        if confidence >= self.model_min_confidence:
-                            # execute command
-                            #execute_command(_COMMANDS_DICT[idx])
-                            land_q.clear()
-                        # print text to image
-                        cv2.putText(
-                            image, f'Gesture: {gesture}', (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0),
-                            4, cv2.LINE_AA)
-                        cv2.putText(
-                            image, f'Gesture: {gesture}', (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255),
-                            2, cv2.LINE_AA)
-                        cv2.putText(image, f'Confidence: {confidence:.3f}', (10, 65),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4, cv2.LINE_AA)
-                        cv2.putText(image, f'Confidence: {confidence:.3f}', (10, 65),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
-
-                # draw boundingbox
-                x, y, w, h = bounding_rect(image, hand_landmarks)
-                cv2.rectangle(image, (x, y), (w, h), (0, 0, 255), 1)
-                cv2.rectangle(image, (x, y), (w, y-22), (0, 0, 255), -1)
-                cv2.putText(image, 'Tracking', (x + 5, y - 4),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
-
-                # draw hands
-                for hand_landmarks in results.multi_hand_landmarks:
-                    mp_drawing.draw_landmarks(
-                        image,
-                        hand_landmarks,
-                        mp_hands.HAND_CONNECTIONS,
-                        mp_drawing_styles.get_default_hand_landmarks_style(),
-                        mp_drawing_styles.get_default_hand_connections_style())
 
             # show capture
             cv2.imshow('MediaPipe Hands', image)
