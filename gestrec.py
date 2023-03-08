@@ -29,8 +29,8 @@ _COMMANDS_DICT = {
 
 class Gestrec():
 
-    # set member-variables
-    def __init__(self) -> None:
+    # aiding functions
+    def __init__(self) -> None:                         # __init__: set member-variables
         # mediapipe
         self.mediapipe_model_complexity = 0
         self.mediapipe_min_detection_confidence = 0.8
@@ -62,7 +62,6 @@ class Gestrec():
         self.__labels = 0
         self.__label = 0
         self.__label_count = 0
-
 
     def __start_listener__(self):
         print("Entered __start_listener__")
@@ -97,6 +96,34 @@ class Gestrec():
         sleep(1)
         return proc
 
+
+    def process_gesture(self, image):
+        #print("Got into classification block")
+        #sleep(10)
+        predict_result = np.squeeze(self.__model.predict_proba(np.array(self.__land_q).reshape(1, -1)))       # pass the queue
+        idx = np.argmax(predict_result)
+        gesture, confidence = self.__labels[idx], predict_result[idx]
+        if idx != 0:
+            if confidence >= self.model_min_confidence:
+                # execute command
+                # deactivate for work with webcam
+                # execute_command(_COMMANDS_DICT[idx])
+                self.__land_q.clear()
+            # print text to image
+            cv2.putText(
+                image, f'Gesture: {gesture}', (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0),
+                4, cv2.LINE_AA)
+            cv2.putText(
+                image, f'Gesture: {gesture}', (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255),
+                2, cv2.LINE_AA)
+            cv2.putText(image, f'Confidence: {confidence:.3f}', (10, 65),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4, cv2.LINE_AA)
+            cv2.putText(image, f'Confidence: {confidence:.3f}', (10, 65),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
+
+
     def process_landmarks(self, image, results):
         # process hand landmarks
         hand_landmarks = get_nearest_hand(results.multi_hand_landmarks)
@@ -117,30 +144,7 @@ class Gestrec():
         # predict gesture using model
         #print(self.dev_mode,self._model_active.value, len(land_q))
         if not self.dev_mode and self._model_active.value and len(self.__land_q) == self.__land_q.maxlen:
-
-            #print("Got into classification block")
-            #sleep(10)
-            predict_result = np.squeeze(self.__model.predict_proba(np.array(self.__land_q).reshape(1, -1)))       # pass the queue
-            idx = np.argmax(predict_result)
-            gesture, confidence = self.__labels[idx], predict_result[idx]
-            if idx != 0:
-                if confidence >= self.model_min_confidence:
-                    # execute command
-                    #execute_command(_COMMANDS_DICT[idx])
-                    self.__land_q.clear()
-                # print text to image
-                cv2.putText(
-                    image, f'Gesture: {gesture}', (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0),
-                    4, cv2.LINE_AA)
-                cv2.putText(
-                    image, f'Gesture: {gesture}', (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255),
-                    2, cv2.LINE_AA)
-                cv2.putText(image, f'Confidence: {confidence:.3f}', (10, 65),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4, cv2.LINE_AA)
-                cv2.putText(image, f'Confidence: {confidence:.3f}', (10, 65),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
+            self.process_gesture(image)
 
         # draw boundingbox
         x, y, w, h = bounding_rect(image, hand_landmarks)
@@ -161,6 +165,7 @@ class Gestrec():
 
 
     # runs in parallel
+    # main gestrec process
     def __run_gestrec__(self):
         # video capture ################################################################################################
         self.__cap = cv2.VideoCapture(self.cv_cap_source)
