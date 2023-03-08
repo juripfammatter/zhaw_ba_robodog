@@ -72,7 +72,7 @@ class Gestrec():
         print("Started parallel process __run_gestrec__")
         # __run_gestrec__ listens to GESTREC_PORT = 4444
         listener = get_conn_listener(GESTREC_PORT)
-        # poll permanently: process messages and set flags
+        # polls permanently: process messages and set flags
         while True:
             con = listener.accept()
             msg = con.recv()                # received message on GESTREC_PORT = 4444
