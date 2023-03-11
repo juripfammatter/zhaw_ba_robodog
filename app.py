@@ -42,11 +42,13 @@ class ControlScreen(QDialog):
         super(ControlScreen, self).__init__()
         loadUi(ui_control_window, self)
         # assign handlers to buttons
-        self.activateButton.clicked.connect(self.start_recognition)     # sends message on port -> set flag afterwards    
-        self.stopButton.clicked.connect(self.stop_recognition)
-        self.exitButton.clicked.connect(self.close_app)
-        self.sitButton.clicked.connect(self.sit_down)
-        self.standButton.clicked.connect(self.stand_up)
+        self.activateButton.clicked.connect(self.start_recognition)     # GESTREC_PORT, for flags
+        self.stopButton.clicked.connect(self.stop_recognition)          # GESTREC_PORT, for flags
+        self.sitButton.clicked.connect(self.sit_down)                   # COMMAND_PORT, for execution
+        self.standButton.clicked.connect(self.stand_up)                 # COMMAND_PORT, for execution
+
+        self.exitButton.clicked.connect(self.close_app)                 # GESTREC_PORT: _GSTREC_STOP, COMMAND_PORT: _COMMAND_STOP
+
         print("registered buttons")
         print("calling gestrec.start() now")
         gestrec.start()                         # starts the listener in parallel
@@ -67,8 +69,8 @@ class ControlScreen(QDialog):
         execute_command(COMMAND_STAND)
 
     def close_app(self):
-        gestrec_stop()
-        commandexec_stop()
+        gestrec_stop()          # GESTREC_PORT: _GSTREC_STOP
+        commandexec_stop()      # COMMAND_PORT: _COMMAND_STOP
         sys.exit()
 
 
@@ -88,3 +90,4 @@ if __name__ == '__main__':
         sys.exit(app.exec())
     except:
         print("Exiting")
+

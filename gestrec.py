@@ -63,6 +63,7 @@ class Gestrec():
         self.__label = 0
         self.__label_count = 0
 
+
     def __start_listener__(self):
         print("Entered __start_listener__")
         print("Listening to GESTREC_PORT")
@@ -77,7 +78,7 @@ class Gestrec():
             con = listener.accept()
             msg = con.recv()                # received message on GESTREC_PORT = 4444
             print("received message on GESTREC_PORT = 4444")
-            if msg == _GSTREC_STOP:
+            if msg == _GSTREC_STOP:         # called by ControlScreen: exitButton
                 self._cap_proc.terminate()
                 sys.exit()
             elif msg == _GESTREC_OFF:
@@ -86,6 +87,7 @@ class Gestrec():
             elif msg == _GESTREC_ON:
                 print("received _GESTREC_ON")
                 self._model_active.value = True
+
 
     def start(self):
         # initialize and start parallel process (multiprocessing)
@@ -97,7 +99,7 @@ class Gestrec():
         return proc
 
 
-    def process_gesture(self, image):
+    def __process_gesture__(self, image):
         #print("Got into classification block")
         #sleep(10)
         predict_result = np.squeeze(self.__model.predict_proba(np.array(self.__land_q).reshape(1, -1)))       # pass the queue
@@ -107,7 +109,7 @@ class Gestrec():
             if confidence >= self.model_min_confidence:
                 # execute command
                 # deactivate for work with webcam
-                # execute_command(_COMMANDS_DICT[idx])
+                #execute_command(_COMMANDS_DICT[idx])
                 self.__land_q.clear()
             # print text to image
             cv2.putText(
@@ -124,7 +126,7 @@ class Gestrec():
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
 
 
-    def process_landmarks(self, image, results):
+    def __process_landmarks__(self, image, results):
         # process hand landmarks
         hand_landmarks = get_nearest_hand(results.multi_hand_landmarks)
         landmarks = preprocess_landmarks(hand_landmarks)
@@ -144,7 +146,7 @@ class Gestrec():
         # predict gesture using model
         #print(self.dev_mode,self._model_active.value, len(land_q))
         if not self.dev_mode and self._model_active.value and len(self.__land_q) == self.__land_q.maxlen:
-            self.process_gesture(image)
+            self.__process_gesture__(image)
 
         # draw boundingbox
         x, y, w, h = bounding_rect(image, hand_landmarks)
@@ -161,7 +163,6 @@ class Gestrec():
                 mp_hands.HAND_CONNECTIONS,
                 mp_drawing_styles.get_default_hand_landmarks_style(),
                 mp_drawing_styles.get_default_hand_connections_style())
-
 
 
     # runs in parallel
@@ -220,13 +221,14 @@ class Gestrec():
 
             if results.multi_hand_landmarks:
                 #process_Landmarks
-                self.process_landmarks(image, results)
+                self.__process_landmarks__(image, results)
 
 
             # show capture
             cv2.imshow('MediaPipe Hands', image)
 
 
+# Communication functions
 def __send_command__(command):              # MP-command e.g. _GESTREC_ON
     con = get_conn_client(GESTREC_PORT)     # return MP-Client((ADDRESS, port), authkey=AUTHKEY)
     con.send(command)

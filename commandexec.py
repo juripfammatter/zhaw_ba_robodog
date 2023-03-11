@@ -19,6 +19,8 @@ _COMMAND_STOP = 'stop'
 
 class CommandExecutor():
 
+    # called by app.py in startscreen, if "Connect to Robot" is clicked
+    # starts listener for COMMAND_PORT
     def start(self):
         if check_connection():
             proc = Process(target=self.__start_listener__)
@@ -45,6 +47,7 @@ class CommandExecutor():
         if self._sit_thrd.is_alive():
             self._sit_stop.set()
 
+    # commands from gesture recognition
     def __exec_comnd__(self, command):
         self.__stand__()
         sleep(2)
@@ -56,6 +59,7 @@ class CommandExecutor():
         self.__sit__()
         sleep(3)
 
+    # called, if if "Connect to Robot" is clicked in Startscreen
     def __start_listener__(self):
         listener = get_conn_listener(COMMAND_PORT)
         self._cmd_thrd = Thread()
@@ -64,20 +68,31 @@ class CommandExecutor():
         while True:
             con = listener.accept()
             msg = con.recv()
+            # called by ControlScreen: exitButton
             if msg == _COMMAND_STOP:
                 sys.exit()
+            
+            # called by ControlScreen: sitButton
             elif msg == COMMAND_SIT:
                 self.__sit__()
+            # called by ControlScreen: standButton
             elif msg == COMMAND_STAND:
                 self.__stand__()
+            
+            # if none of the default-commands is called
+            # executes commands from gesture recognition
             elif (not self._cmd_thrd.is_alive()) and (self._sit_thrd.is_alive()):
+                # thread for command from gesture recognition, passes parameter "msg"
                 self._cmd_thrd = Thread(target=self.__exec_comnd__, args=(msg,))
                 self._cmd_thrd.daemon = True
+                # start thread i.e. action according to gesture
                 self._cmd_thrd.start()
 
 
 def execute_command(command):
+    # sends to COMMAND_PORT (__start_listener__ listens) 
     con = get_conn_client(COMMAND_PORT)
+    # send to listener
     con.send(command)
     con.close()
 
