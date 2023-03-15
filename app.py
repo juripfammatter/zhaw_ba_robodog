@@ -36,7 +36,6 @@ class StartScreen(QDialog):
         commandexec_stop()
         sys.exit()
 
-
 class ControlScreen(QDialog):
     def __init__(self):
         super(ControlScreen, self).__init__()
@@ -78,7 +77,7 @@ class ControlScreen(QDialog):
 if __name__ == '__main__':
     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     app = QApplication(sys.argv)
-    start = StartScreen()           # startscreen then calls controlscreen
+    start = StartScreen()           # startscreen has button for controlscreen
     # start = ControlScreen()
     widget = QStackedWidget()
     widget.addWidget(start)
