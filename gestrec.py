@@ -8,6 +8,8 @@ import ctypes
 import sys
 from time import sleep
 from commandexec import COMMAND_WALK, COMMAND_WIGGLE, COMMAND_DOWN, COMMAND_SPIN, execute_command
+import roslibpy
+import time
 
 from auxillary_funcs.ml import get_nearest_hand, preprocess_landmarks, write_csv, read_labels, bounding_rect
 from auxillary_funcs.interprocess_comms import get_conn_listener, get_conn_client, GESTREC_PORT
@@ -48,17 +50,15 @@ class Gestrec():
 
         # openCV
         self.cv_cap_flip = True
-        self.cv_cap_source = 0  # 0 == default device
+        #self.cv_cap_source = 0  # 0 == default device
         self.cv_cap_source = 'http://192.168.123.12:8080/?action=stream'  # 0 == default device
 
         # processes
         self._cap_proc = None
 
     def __start_listener__(self):
-        # initialize and start parallel process (multiprocessing)
         self._cap_proc = Process(target=self.__run_gestrec__)
         self._cap_proc.start()
-        # set listener on a port
         listener = get_conn_listener(GESTREC_PORT)
         while True:
             con = listener.accept()
@@ -72,14 +72,17 @@ class Gestrec():
                 self._model_active.value = True
 
     def start(self):
-        # initialize and start parallel process (multiprocessing)
         proc = Process(target=self.__start_listener__)
         proc.start()
         sleep(1)
         return proc
 
-    # runs in parallel
     def __run_gestrec__(self):
+        client= roslibpy.Ros(host='localhost', port=9090)
+        client.run()
+        talker= roslibpy.Topic(client, '/chatter', 'std_msgs/String')
+        self._model_active.value = True
+
         # video capture ################################################################################################
 
         cap = cv2.VideoCapture(self.cv_cap_source)
@@ -106,7 +109,7 @@ class Gestrec():
         label = -1
         label_count = 1
 
-        while cap.isOpened():
+        while cap.isOpened() and client.is_connected:
             # capture image
             success, image = cap.read()
             if not success:
@@ -138,7 +141,7 @@ class Gestrec():
                 # process hand landmarks
                 hand_landmarks = get_nearest_hand(results.multi_hand_landmarks)
                 landmarks = preprocess_landmarks(hand_landmarks)
-                land_q.append(landmarks)        # queue
+                land_q.append(landmarks)
 
                 # process landmarks and save to CSV when in dev_mode
                 if self.dev_mode and label != -1:
@@ -151,14 +154,18 @@ class Gestrec():
 
                 # predict gesture using model
                 if not self.dev_mode and self._model_active.value and len(land_q) == land_q.maxlen:
-                    predict_result = np.squeeze(model.predict_proba(np.array(land_q).reshape(1, -1)))       # pass the queue
+                    predict_result = np.squeeze(model.predict_proba(np.array(land_q).reshape(1, -1)))
                     idx = np.argmax(predict_result)
                     gesture, confidence = labels[idx], predict_result[idx]
                     if idx != 0:
                         if confidence >= self.model_min_confidence:
                             # execute command
-                            execute_command(_COMMANDS_DICT[idx])
+                            #execute_command(_COMMANDS_DICT[idx])
                             land_q.clear()
+                            talker.publish(roslibpy.Message({'data': _COMMANDS_DICT[idx]}))
+                            print('Sending gesture...')
+                            time.sleep(1)
+
                         # print text to image
                         cv2.putText(
                             image, f'Gesture: {gesture}', (10, 30),
@@ -192,6 +199,10 @@ class Gestrec():
             # show capture
             cv2.imshow('MediaPipe Hands', image)
 
+        talker.unadvertise()
+        client.terminate()
+
+
 
 def __send_command__(command):
     con = get_conn_client(GESTREC_PORT)
@@ -209,3 +220,10 @@ def gestrec_on():
 
 def gestrec_off():
     __send_command__(_GESTREC_OFF)
+
+
+# main when gestrec.py is used without app.py (GUI) ################################################################################################
+
+if __name__ == '__main__':
+    Gestrec().start()
+
